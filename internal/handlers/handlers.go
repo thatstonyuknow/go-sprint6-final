@@ -11,14 +11,34 @@ import (
 	"github.com/Yandex-Practicum/go1fl-sprint6-final/internal/service"
 )
 
-// RootHandler serves the HTML file "index.html" for the root endpoint.
+const safeDir = "." // Use the project root as the safe directory
+
+// RootHandler serves the HTML file "index.html" from the safe directory
 func RootHandler(w http.ResponseWriter, r *http.Request) {
 	// Return 404 if the URL path is not exactly "/".
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
-	data, err := os.ReadFile("index.html")
+
+	// Open the safe directory (project root) as the root.
+	root, err := os.OpenRoot(safeDir)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	defer root.Close()
+
+	// Open index.html relative to the safe directory.
+	file, err := root.Open("index.html")
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	defer file.Close()
+
+	// Read the file contents.
+	data, err := io.ReadAll(file)
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -27,15 +47,10 @@ func RootHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// UploadHandler processes the file upload.
-// It parses the multipart form data, retrieves the uploaded file,
-// writes its content to a temporary file, and then reads the data
-// using os.ReadFile. The content is passed to the auto-detection function
-// in the service package to obtain the converted string.
-// A local file is then created (using the current UTC time and the uploaded file's extension)
-// to save the conversion result, which is then returned.
+// UploadHandler processes the file upload and safely writes the conversion result
+// into the safe directory using os.OpenRoot.
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
-	// Return 404 if the URL path is not exactly "/".
+	// Return 404 if the URL path is not exactly "/upload".
 	if r.URL.Path != "/upload" {
 		http.NotFound(w, r)
 		return
@@ -67,7 +82,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
-	// Clean up the temporary file when we're done.
+	// Clean up the temporary file when done.
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 
@@ -96,8 +111,16 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	filename := strings.ReplaceAll(time.Now().UTC().String(), " ", "_")
 	filename = strings.ReplaceAll(filename, ":", "-") + ext
 
-	// Create a local file to save the conversion result.
-	localFile, err := os.Create(filename)
+	// Open the safe directory (project root) as the root.
+	root, err := os.OpenRoot(safeDir)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	defer root.Close()
+
+	// Create a local file within the safe directory using the safe root.
+	localFile, err := root.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -105,7 +128,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	defer localFile.Close()
 
 	// Write the conversion result to the local file.
-	if _, err = localFile.WriteString(converted); err != nil {
+	if _, err = localFile.Write([]byte(converted)); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
