@@ -15,7 +15,7 @@ func main() {
 	srv := server.MyServer(logger)
 
 	// Running server with recevied parameters
-    logger.Println("Running server at 8080...")
+    logger.Println("Server on :8080")
     if err := srv.HTTPServer.ListenAndServe(); err != nil {
         logger.Fatal("Error while server start: ", err)
     }
