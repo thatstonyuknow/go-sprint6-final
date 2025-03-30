@@ -29,7 +29,7 @@ func MyServer(logger *log.Logger) *Server {
 	// Register the root handler to serve index.html.
 	router.HandleFunc("/", handlers.RootHandler)
 	// Register the upload handler to process file uploads.
-	router.HandleFunc("/upload", handlers.UploadHandler)
+	router.HandleFunc("POST /upload", handlers.UploadHandler)
 
 	// Wrap the router with the logging middleware.
 	loggedRouter := loggingMiddleware(logger, router)
